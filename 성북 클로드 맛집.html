@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>성북구 맛집 지도</title>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+  :root {
+    --bg: #0F0F13;
+    --surface: #1A1A22;
+    --surface2: #22222E;
+    --border: rgba(255,255,255,0.07);
+    --text: #F2F2F5;
+    --text-sub: #888899;
+    --accent: #FF6B35;
+    --star-fill: #FFD700;
+    --star-empty: #2E2E3E;
+    --tag-bg: rgba(255,107,53,0.12);
+    --tag-text: #FF8C5C;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Pretendard', -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+  body::before {
+    content:'';
+    position:fixed; top:-20%; left:-10%;
+    width:60vw; height:60vw;
+    background: radial-gradient(circle, rgba(255,107,53,0.06) 0%, transparent 70%);
+    pointer-events:none; z-index:0;
+  }
+  .container { max-width:480px; margin:0 auto; padding:0 20px 80px; position:relative; z-index:1; }
+
+  /* 헤더 */
+  header { padding:52px 0 24px; animation: fadeUp .6s ease both; }
+  .header-label { font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin-bottom:8px; }
+  header h1 { font-size:28px; font-weight:800; line-height:1.2; letter-spacing:-.03em; }
+  header p { margin-top:8px; font-size:14px; color:var(--text-sub); }
+
+  /* 통계 */
+  .stats-bar { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; animation: fadeUp .6s .1s ease both; }
+  .stat-pill {
+    background:var(--surface); border:1px solid var(--border); border-radius:100px;
+    padding:7px 14px; font-size:12px; font-weight:600; color:var(--text-sub);
+    display:flex; align-items:center; gap:5px;
+  }
+  .stat-pill span { color:var(--text); }
+
+  /* 검색/필터 */
+  .filter-bar { display:flex; gap:8px; margin-bottom:20px; overflow-x:auto; padding-bottom:4px; animation: fadeUp .6s .15s ease both; }
+  .filter-bar::-webkit-scrollbar { display:none; }
+  .filter-btn {
+    background:var(--surface); border:1px solid var(--border); border-radius:100px;
+    padding:7px 14px; font-size:12px; font-weight:600; color:var(--text-sub);
+    cursor:pointer; white-space:nowrap; transition:all .2s; font-family:inherit;
+  }
+  .filter-btn.active, .filter-btn:hover {
+    background:var(--accent); border-color:var(--accent); color:white;
+  }
+
+  /* 카드 그리드 */
+  .cards { display:flex; flex-direction:column; gap:14px; }
+  .card {
+    background:var(--surface); border:1px solid var(--border); border-radius:20px;
+    overflow:hidden; cursor:pointer;
+    transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    animation: fadeUp .5s ease both;
+  }
+  .card:hover { transform:translateY(-3px); box-shadow:0 20px 50px rgba(0,0,0,.4); border-color:rgba(255,107,53,.25); }
+  .card:active { transform:translateY(-1px); }
+  .card.hidden { display:none; }
+
+  /* 카드 이미지 */
+  .card-img-wrap { position:relative; overflow:hidden; height:150px; background:var(--surface2); }
+  .card-img-wrap img { width:100%; height:150px; object-fit:cover; display:block; transition:transform .4s ease; }
+  .card:hover .card-img-wrap img { transform:scale(1.05); }
+  .img-placeholder {
+    width:100%; height:150px; display:flex; align-items:center; justify-content:center;
+    font-size:36px; background:var(--surface2);
+  }
+  .rank-badge {
+    position:absolute; top:12px; left:12px;
+    width:28px; height:28px; border-radius:50%;
+    background:var(--accent); color:white;
+    font-size:12px; font-weight:800;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 4px 12px rgba(255,107,53,.5);
+  }
+
+  /* 카드 바디 */
+  .card-body { padding:14px 16px 16px; }
+  .card-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+  .card-name { font-size:16px; font-weight:700; letter-spacing:-.02em; }
+  .card-category { font-size:10px; font-weight:600; color:var(--tag-text); background:var(--tag-bg); padding:3px 9px; border-radius:100px; white-space:nowrap; margin-top:2px; }
+
+  /* 별점 */
+  .stars-wrap { display:flex; align-items:center; gap:6px; margin-bottom:8px; }
+  .stars { display:flex; gap:2px; }
+  .star { font-size:13px; color:var(--star-empty); }
+  .star.filled { color:var(--star-fill); filter:drop-shadow(0 0 3px rgba(255,215,0,.4)); animation: starPop .35s ease both; }
+  .rating-num { font-size:13px; font-weight:700; }
+  .rating-count { font-size:11px; color:var(--text-sub); }
+
+  /* 키워드 태그 */
+  .tags { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px; }
+  .tag {
+    font-size:11px; color:var(--text-sub);
+    background:var(--surface2); border:1px solid var(--border);
+    padding:3px 9px; border-radius:100px;
+  }
+
+  /* 메타 */
+  .card-meta { display:flex; gap:14px; }
+  .meta-item { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-sub); font-weight:500; }
+
+  /* 지도 버튼 */
+  .map-btn {
+    display:flex; width:100%; margin-top:24px;
+    padding:15px; background:var(--surface);
+    border:1px solid var(--border); border-radius:16px;
+    color:var(--text); font-family:inherit; font-size:14px; font-weight:600;
+    text-align:center; cursor:pointer; text-decoration:none;
+    align-items:center; justify-content:center; gap:8px;
+    transition:background .2s, border-color .2s;
+    animation: fadeUp .6s .5s ease both;
+  }
+  .map-btn:hover { background:var(--surface2); border-color:rgba(255,107,53,.3); }
+
+  /* 지도 모달 */
+  .map-modal-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,.75); backdrop-filter:blur(8px);
+    z-index:100; display:flex; align-items:flex-end;
+    opacity:0; pointer-events:none; transition:opacity .3s ease;
+  }
+  .map-modal-overlay.active { opacity:1; pointer-events:all; }
+  .map-sheet {
+    width:100%; max-width:480px; margin:0 auto;
+    background:var(--surface); border-radius:24px 24px 0 0;
+    overflow:hidden; transform:translateY(100%);
+    transition:transform .4s cubic-bezier(.34,1.20,.64,1);
+    max-height:92vh; display:flex; flex-direction:column;
+  }
+  .map-modal-overlay.active .map-sheet { transform:translateY(0); }
+  .map-sheet-handle { width:36px; height:4px; background:rgba(255,255,255,.15); border-radius:2px; margin:12px auto 0; flex-shrink:0; }
+  .map-sheet-header {
+    padding:12px 20px 10px; display:flex; align-items:center; justify-content:space-between;
+    flex-shrink:0; border-bottom:1px solid var(--border);
+  }
+  .map-sheet-title { font-size:16px; font-weight:700; letter-spacing:-.02em; }
+  .map-sheet-close {
+    width:28px; height:28px; border-radius:50%; background:var(--surface2);
+    border:none; color:var(--text-sub); font-size:14px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #map-container { height:280px; flex-shrink:0; }
+  .map-place-list { overflow-y:auto; padding:10px 14px 28px; display:flex; flex-direction:column; gap:8px; flex:1; }
+  .map-place-item {
+    display:flex; align-items:center; gap:10px; padding:10px 12px;
+    background:var(--surface2); border-radius:12px; border:1px solid var(--border);
+    cursor:pointer; transition:border-color .2s, transform .15s;
+  }
+  .map-place-item:hover { border-color:rgba(255,107,53,.35); transform:translateX(3px); }
+  .map-place-rank {
+    width:24px; height:24px; border-radius:50%; background:var(--accent);
+    color:white; font-size:11px; font-weight:800;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .map-place-info { flex:1; min-width:0; }
+  .map-place-name { font-size:13px; font-weight:700; margin-bottom:1px; }
+  .map-place-addr { font-size:10px; color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .map-place-stars { font-size:11px; color:var(--star-fill); flex-shrink:0; }
+  .leaflet-tile-pane { filter:brightness(.72) saturate(.5) hue-rotate(180deg) invert(1); }
+
+  @keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes starPop { 0%{transform:scale(.5);opacity:0} 60%{transform:scale(1.25)} 100%{transform:scale(1);opacity:1} }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-label">📍 성북구</div>
+    <h1>나의 맛집 지도</h1>
+    <p>직접 발굴한 성북구 카페 & 베이커리 모음</p>
+  </header>
+
+  <div class="stats-bar">
+    <div class="stat-pill">☕ <span>14</span>곳</div>
+    <div class="stat-pill">⭐ 평균 <span>3.8</span></div>
+    <div class="stat-pill">성북구</div>
+  </div>
+
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="filterCards('all', this)">전체</button>
+    <button class="filter-btn" onclick="filterCards('베이커리', this)">🥐 베이커리</button>
+    <button class="filter-btn" onclick="filterCards('카페', this)">☕ 카페</button>
+    <button class="filter-btn" onclick="filterCards('고평점', this)">⭐ 4.0+</button>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <button class="map-btn" onclick="openMap()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    지도에서 전체 보기
+  </button>
+</div>
+
+<!-- 지도 모달 -->
+<div class="map-modal-overlay" id="mapModal" onclick="handleOverlayClick(event)">
+  <div class="map-sheet">
+    <div class="map-sheet-handle"></div>
+    <div class="map-sheet-header">
+      <span class="map-sheet-title">🗺️ 성북구 맛집 지도</span>
+      <button class="map-sheet-close" onclick="closeMap()">✕</button>
+    </div>
+    <div id="map-container"></div>
+    <div class="map-place-list" id="mapList"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const places = [
+ 
+  { name:'카페이립스', cat:'베이커리', addr:'성북구 고려대로7길 84-7', rating:3.5, lat:37.5893874, lng:127.0189072, keywords:['콘센트 제공','토스트 맛집','아기자기'], hours:'12:00–23:00', emoji:'🍞', img:'image/카페이립스.jpg' },
+  { name:'로스디아스', cat:'베이커리', addr:'성북구 동소문로22길 67', rating:3.7, lat:37.5901361, lng:127.0188772, keywords:['소금빵 맛집','나무 의자','수다떨기 좋은 곳'], hours:'12:00–21:00', emoji:'🥖', img:'image/로스디아스.jpg' },
+  { name:'카페뮬', cat:'베이커리', addr:'성북구 동소문로22길 64', rating:4.1, lat:37.5902132, lng:127.0185037, keywords:['공부하기 좋은 곳','많은 콘센트','귀여운 강아지'], hours:'10:00–02:00', emoji:'🐶', img:'image/카페뮬_1.jpg' },
+  { name:'밀크브라운', cat:'베이커리', addr:'성북구 고려대로28길 21', rating:3.8, lat:37.5855346, lng:127.0310962, keywords:['많은 좌석','많은 콘센트','소금빵 맛집'], hours:'11:00–22:00', emoji:'🥛', img:'image/밀크브라운_1.jpg' },
+  { name:'대나무다방', cat:'카페', addr:'성북구 안암로 73-3', rating:3.5, lat:37.5877, lng:127.0265, keywords:['다양한 좌석','개방적인 분위기'], hours:'미확인', emoji:'🎋', img:'image/대나무다방_1.jpg' },
+  { name:'꽁빠뉴', cat:'베이커리', addr:'성북구 동소문로23길 8-10', rating:3.7, lat:37.5942708, lng:127.0180873, keywords:['다양한 좌석','산도 맛집','수다하기 좋은 곳'], hours:'미확인', emoji:'🥐', img:'image/꽁빠뉴_1.jpg' },
+  { name:'유목커피바', cat:'카페', addr:'성북구 동소문로24길 47', rating:3.2, lat:37.5916134, lng:127.018721, keywords:['대화하기 좋은 곳','푸딩 맛집'], hours:'12:30–22:00', emoji:'☕', img:'image/유목커피바_1.jpg' },
+  { name:'모안', cat:'베이커리', addr:'성북구 보문로25길 10', rating:4.3, lat:37.5862785, lng:127.0180992, keywords:['엄청난 라떼 맛집','귀여운 소품','조용한 공간'], hours:'미확인', emoji:'🌿', img:'image/모안.jpg' },
+  { name:'베럴버터', cat:'베이커리', addr:'성북구 삼선교로24길 42', rating:4.3, lat:37.5883441, lng:127.016413, keywords:['휘낭시에 맛집','가성비','공부하기는 좁은 공간'], hours:'미확인', emoji:'🧈', img:'image/베럴버터.jpg' },
+  { name:'브라운헤이븐 삼선교', cat:'카페', addr:'성북구 동소문로6길 4-14', rating:3.4, lat:37.588626, lng:127.0073707, keywords:['쾌적한 환경','이용시간 존재','타르트 맛집'], hours:'12:00–22:00', emoji:'🫐', img:'image/브라운헤이븐.jpg' },
+  { name:'로제또', cat:'베이커리', addr:'성북구 보문로34길 72', rating:3.5, lat:37.5910173, lng:127.0193061, keywords:['티라미수 아이스크림','녹차 아이스크림'], hours:'11:00–22:00', emoji:'🍦', img:'image/로제또.jpg' },
+  { name:'폼드팡 성신여대점', cat:'베이커리', addr:'성북구 동소문로22길 15', rating:3.5, lat:37.5923456, lng:127.0177614, keywords:['버터떡','상큼달콤'], hours:'09:00–23:00', emoji:'🎂', img:'' },
+  { name:'빵미숙 (종암로9길)', cat:'베이커리', addr:'성북구 종암로9길 8', rating:3.8, lat:37.5957563, lng:127.0351513, keywords:['소금빵','바통','크루아상'], hours:'미확인', emoji:'🍞', img:'image/빵미숙.jpg' },
+  { name:'빵미숙 (종암로14길)', cat:'베이커리', addr:'성북구 종암로14길 12-16', rating:3.8, lat:37.5965018, lng:127.0362718, keywords:['애견카페','두쫀쿠 맛집'], hours:'미확인', emoji:'🐾', img:'image/싱글벙글.jpg' },
+];
+
+// 별 렌더링
+function starsHTML(rating) {
+  let s = '';
+  for(let i=1; i<=5; i++){
+    const filled = i <= Math.round(rating);
+    s += `<span class="star${filled?' filled':''}">★</span>`;
+  }
+  return s;
+}
+
+// 카드 렌더링
+function renderCards(list) {
+  const container = document.getElementById('cards');
+  container.innerHTML = '';
+  list.forEach((p, i) => {
+    const delay = (i * 0.04).toFixed(2);
+    const tags = p.keywords.map(k => `<span class="tag">${k}</span>`).join('');
+    container.innerHTML += `
+      <div class="card" data-cat="${p.cat}" data-rating="${p.rating}" style="animation-delay:${delay}s">
+        <div class="card-img-wrap">
+          ${p.img ? `<img src="${p.img}" alt="${p.name}" style="width:100%;height:150px;object-fit:cover;display:block;">` : `<div class="img-placeholder">${p.emoji}</div>`}
+          <div class="rank-badge">${i+1}</div>
+        </div>
+        <div class="card-body">
+          <div class="card-top">
+            <div class="card-name">${p.name}</div>
+            <div class="card-category">${p.cat}</div>
+          </div>
+          <div class="stars-wrap">
+            <div class="stars">${starsHTML(p.rating)}</div>
+            <span class="rating-num">${p.rating}</span>
+          </div>
+          <div class="tags">${tags}</div>
+          <div class="card-meta">
+            <div class="meta-item">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              ${p.hours}
+            </div>
+            <div class="meta-item">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              ${p.addr}
+            </div>
+          </div>
+        </div>
+      </div>`;
+  });
+}
+renderCards(places);
+
+// 필터
+function filterCards(type, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const cards = document.querySelectorAll('.card');
+  cards.forEach((c, i) => {
+    const cat = c.dataset.cat;
+    const rating = parseFloat(c.dataset.rating);
+    let show = false;
+    if(type === 'all') show = true;
+    else if(type === '고평점') show = rating >= 4.0;
+    else show = cat === type;
+    c.classList.toggle('hidden', !show);
+  });
+}
+
+// 지도
+let map = null, markers = [];
+function openMap() {
+  document.getElementById('mapModal').classList.add('active');
+  document.body.style.overflow = 'hidden';
+  setTimeout(initMap, 350);
+}
+function closeMap() {
+  document.getElementById('mapModal').classList.remove('active');
+  document.body.style.overflow = '';
+}
+function handleOverlayClick(e) {
+  if(e.target === document.getElementById('mapModal')) closeMap();
+}
+function initMap() {
+  if(map){ map.invalidateSize(); return; }
+  map = L.map('map-container', { center:[37.5905, 127.0190], zoom:14, zoomControl:true, attributionControl:false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(map);
+
+  const list = document.getElementById('mapList');
+  list.innerHTML = '';
+
+  places.forEach((p, i) => {
+    const icon = L.divIcon({
+      className:'',
+      html:`<div style="width:32px;height:32px;background:#FF6B35;border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 4px 14px rgba(255,107,53,.65);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);font-size:11px;font-weight:800;color:white;">${i+1}</span></div>`,
+      iconSize:[32,32], iconAnchor:[16,32], popupAnchor:[0,-34]
+    });
+    const m = L.marker([p.lat, p.lng], {icon}).addTo(map)
+      .bindPopup(`<div style="font-family:'Pretendard',sans-serif;min-width:120px;"><div style="font-weight:700;font-size:13px;margin-bottom:2px;">${p.name}</div><div style="color:#FF6B35;font-size:12px;">⭐ ${p.rating}</div></div>`, {offset:[0,-6]});
+    markers.push(m);
+
+    const starsStr = '★'.repeat(Math.round(p.rating)) + '☆'.repeat(5-Math.round(p.rating));
+    list.innerHTML += `<div class="map-place-item" onclick="flyTo(${i})">
+      <div class="map-place-rank">${i+1}</div>
+      <div class="map-place-info">
+        <div class="map-place-name">${p.name}</div>
+        <div class="map-place-addr">${p.addr}</div>
+      </div>
+      <div class="map-place-stars">${starsStr}</div>
+    </div>`;
+  });
+}
+function flyTo(i) {
+  if(!map) return;
+  map.flyTo([places[i].lat, places[i].lng], 17, {animate:true, duration:.8});
+  setTimeout(() => markers[i].openPopup(), 900);
+}
+</script>
+</body>
+</html>
