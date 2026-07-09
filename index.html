@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>성북 빵지도</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div>
+    <p class="title">🥐 성북 빵지도</p>
+    <p class="subtitle">성북구 빵집 · 카페 14곳</p>
+  </div>
+</header>
+
+<div class="layout">
+  <div id="sidebar"></div>
+  <div id="map-wrap">
+    <div id="map"></div>
+  </div>
+</div>
+
+<script src="places.js"></script>
+
+<!--
+  ▼▼▼ 여기에 본인의 카카오 JavaScript 키를 넣어주세요 ▼▼▼
+  발급 방법: Kakao Developers(https://developers.kakao.com) 접속
+  → 내 애플리케이션 → 애플리케이션 추가
+  → 앱 키 탭에서 "JavaScript 키" 복사
+  → 플랫폼 탭에서 Web 플랫폼 등록 (사이트 도메인에 배포할 GitHub Pages 주소 입력)
+  → 아래 YOUR_APP_KEY 자리에 붙여넣기
+-->
+<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=0d0bf32cd63ee1ed3263707d335942ab&libraries=services&autoload=false"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
